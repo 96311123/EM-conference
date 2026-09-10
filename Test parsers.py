@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """離線測試：用四個網站 2026-09 抓下來的真實文字片段驗證解析器。"""
-from em_conferences import parse_acep, parse_saem, parse_ifem, parse_eusem, parse_date_range
+from em_conferences import (parse_acep, parse_saem, parse_ifem, parse_eusem,
+                            parse_date_range, parse_generic_society)
 
 ACEP_TXT = """Future Dates
 ACEP27 Scientific Assembly
@@ -21,6 +22,10 @@ Chicago, Illinois
 ACEP32 Scientific Assembly
 10/4/2032 - 10/7/2032
 Dallas, Texas"""
+
+ACEP_CURRENT_TXT = """ACEP Scientific Assembly 2026
+Join Us for ACEP26 | October 5-8, 2026
+We're excited to be in | Chicago, Illinois, United States | for ACEP26"""
 
 SAEM_TXT = """Future Meetings
 Annual Meeting
@@ -70,6 +75,12 @@ def show(rows):
 
 
 print("ACEP"); show(parse_acep(ACEP_TXT))
+acep_current = parse_acep(ACEP_CURRENT_TXT)
+assert len(acep_current) == 1
+assert acep_current[0].year == 2026
+assert acep_current[0].start == "2026-10-05"
+assert acep_current[0].end == "2026-10-08"
+assert acep_current[0].city == "Chicago"
 print("SAEM"); show(parse_saem(SAEM_TXT))
 print("IFEM"); show(parse_ifem(IFEM_TXT))
 print("EUSEM"); show(parse_eusem(EUSEM_TXT))
@@ -89,3 +100,14 @@ cases = [
 ]
 for s, dy in cases:
     print(f"  {s!r:40} -> {parse_date_range(s, dy)}")
+
+print("\n通用學會 parser：只保留未來急診活動")
+assert not parse_generic_society(
+    "13th ACEM\n10-13 Dec 2025\n32nd Annual Scientific Meeting of Hong Kong College of Radiologists\n23-24 November 2024",
+    "HKCEM", "https://hkcem.org.hk/")[0].start
+assert len(parse_generic_society(
+    "Joint Clinical Meeting & Didactic Lectures (JCM)\nScientific Affairs Committee",
+    "HKCEM", "https://hkcem.org.hk/")) == 1
+asian = parse_generic_society("13th ACEM\n10-13 Dec 2025\n14th ACEM\n20-25 Oct 2028",
+                              "ASIANSEM", "https://www.asiansem.org/")
+assert len(asian) == 1 and asian[0].year == 2028

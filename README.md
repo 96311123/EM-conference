@@ -1,13 +1,13 @@
 # 急診國際年會自動追蹤
 
-每週自動擷取 ACEP、SAEM、IFEM、EuSEM 四大急診醫學會的**年會日期地點**與
+每週自動擷取 ACEP、SAEM、IFEM、EuSEM、AsianSEM、HKCEM、SEMS 七個急診醫學會的**年會日期地點**與
 **摘要投稿死線**，產出一頁儀表板、一個帶提醒的行事曆，以及 CSV／JSON。
 
 ## 檔案
 
 ```
-em_conferences.py    年會日期與地點的爬蟲
-deadlines.py         摘要投稿死線的爬蟲（四個學會各一套解析策略）
+   em_conferences.py    年會日期與地點的爬蟲（含 AsianSEM、HKCEM、SEMS）
+ deadlines.py         摘要投稿死線的爬蟲（目前支援四個學會）
 render.py            產生儀表板 HTML 與 .ics 行事曆
 track.py             排程進入點：爬取 → 比對變動 → 產出
 test_parsers.py      年會解析器的離線測試（真實頁面文字，不需連網）
@@ -21,7 +21,7 @@ docs/                儀表板與下載檔（GitHub Pages 就指這個資料夾�
 
 1. 開一個 GitHub repo，把這些檔案放進去，並把 `track.yml` 移到
    `.github/workflows/track.yml`。
-2. 本機先跑一次，確認四個學會都抓得到，並產生第一版 `data/` 與 `docs/`：
+2. 本機先跑一次，確認七個學會都抓得到，並產生第一版 `data/` 與 `docs/`：
 
    ```bash
    pip install requests beautifulsoup4
@@ -37,7 +37,7 @@ docs/                儀表板與下載檔（GitHub Pages 就指這個資料夾�
 ## 自動呈現的三種形式
 
 **儀表板**：`docs/index.html`。上方是「下一場」與倒數天數，中間是年度節奏
-格線（橫軸月份、縱軸年份），下方是完整清單。手機也讀得動。
+格線（橫軸月份、縱軸年份），下方是可點擊的 event cards，手機也讀得動。
 
 **行事曆訂閱**：`docs/conferences.ics`。在 Google 日曆選「其他日曆 → 加入
 網址」，貼上 `https://<帳號>.github.io/<repo>/conferences.ics`，年會與死線
@@ -77,7 +77,7 @@ issue 列出差異，GitHub 寄信給你，信裡開頭就是 30 天內的死線
 
 ## 維護
 
-四個站都是靜態 HTML，`requests` 就夠，不需要 Selenium 或 Playwright。
+這七個站以靜態 HTML 或可直接存取的活動頁為主，`requests` 就夠，不需要 Selenium 或 Playwright。
 
 真正會壞的情況是官網改版。程式對此有兩層防護：
 

@@ -4,7 +4,7 @@
 render.py — 把爬到的年會資料算成 (1) 一頁儀表板 HTML (2) 一個 .ics 行事曆檔。
 
 儀表板的主角是「季節格線」：橫軸十二個月、縱軸年份，一眼就看得出
-四大學會的年度節奏（SAEM 五月、IFEM 六月、EuSEM 九月底、ACEP 十月），
+主要學會的年度節奏（SAEM 五月、IFEM 六月、EuSEM 九月底、ACEP 十月），
 這正是排投稿死線與出國預算時真正需要知道的事。
 """
 
@@ -18,13 +18,25 @@ from pathlib import Path
 
 SOCIETY_META = {
     "ACEP":  {"full": "American College of Emergency Physicians",
-              "meeting": "Scientific Assembly", "hue": "acep"},
+              "meeting": "Scientific Assembly", "hue": "acep",
+              "logo": "https://www.acep.org/siteassets/sites/-comms-global/media/acep-logo3x.png"},
     "SAEM":  {"full": "Society for Academic Emergency Medicine",
-              "meeting": "Annual Meeting", "hue": "saem"},
+              "meeting": "Annual Meeting", "hue": "saem",
+              "logo": "https://www.saem.org/images/default-source/siteimages/logos/logo-2.png?sfvrsn=74156739_4"},
     "IFEM":  {"full": "International Federation for Emergency Medicine",
               "meeting": "Global Congress / ICEM", "hue": "ifem"},
     "EUSEM": {"full": "European Society for Emergency Medicine",
-              "meeting": "European EM Congress", "hue": "eusem"},
+              "meeting": "European EM Congress", "hue": "eusem",
+              "logo": "https://eusem.org/images/2024/EUSEM_CAST_LOGO_SQUARE_WHITE%20%28002%29.png"},
+    "ASIANSEM": {"full": "Asian Society for Emergency Medicine",
+                  "meeting": "Asian Conference on Emergency Medicine", "hue": "asiansem",
+                  "logo": "https://static.wixstatic.com/media/d30827_5fa9ceca05fe446b801aa15557200887~mv2.png/v1/fill/w_114,h_80,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/banner_logo_edited.png"},
+    "HKCEM": {"full": "Hong Kong College of Emergency Medicine",
+              "meeting": "Annual Congress", "hue": "hkcem",
+              "logo": "https://hkcem.org.hk/wp-content/uploads/2022/10/HKCEM-Logo-icon.png"},
+    "SEMS": {"full": "Society for Emergency Medicine in Singapore",
+             "meeting": "Annual Conference", "hue": "sems",
+             "logo": "https://i0.wp.com/sems-online.com/wp-content/uploads/2013/03/cropped-semslogo-copy.png?fit=200%2C192&ssl=1"},
 }
 
 MONTH_ABBR = ["一", "二", "三", "四", "五", "六",
@@ -181,41 +193,56 @@ def build_ics(rows: list[dict], deadlines: list[dict] | None = None) -> str:
 
 CSS = """
 :root{
-  --paper:#e8edef; --surface:#fdfdfc; --ink:#13222a; --muted:#5f747e;
-  --rule:#c6d1d6; --rule-soft:#dde5e8;
-  --acep:#9d3a2e; --saem:#2f6a56; --ifem:#8a6820; --eusem:#33518c;
+        --paper:#f4f6f3; --surface:#ffffff; --ink:#17252b; --muted:#65767b;
+        --navy:#102d36; --navy-soft:#214650; --mint:#dceee8;
+        --rule:#d8e1df; --rule-soft:#e8eeec;
+    --acep:#9d3a2e; --saem:#2f6a56; --ifem:#8a6820; --eusem:#33518c;
+    --asiansem:#9b5d2d; --hkcem:#6b4c78; --sems:#2d6870;
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{
-  margin:0; background:var(--paper); color:var(--ink);
-  font-family:Newsreader,"Iowan Old Style","Source Serif 4",Georgia,
-              "Noto Serif TC","PingFang TC","Microsoft JhengHei",serif;
-  font-size:17px; line-height:1.55; font-variant-numeric:tabular-nums;
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    font-size:15px; line-height:1.6; font-variant-numeric:tabular-nums;
 }
-.wrap{max-width:1080px; margin:0 auto; padding:2.5rem 1.5rem 5rem}
-a{color:inherit; text-decoration-thickness:1px; text-underline-offset:2px}
+.wrap{max-width:1180px; margin:0 auto; padding:0 1.5rem 5rem}
+a{color:inherit; text-decoration-thickness:1px; text-underline-offset:3px}
 a:focus-visible,summary:focus-visible{outline:2px solid var(--ink); outline-offset:3px}
 
-.masthead{display:flex; justify-content:space-between; align-items:baseline;
-  gap:1rem; flex-wrap:wrap; border-bottom:1px solid var(--ink); padding-bottom:.6rem}
-.masthead h1{font-size:1.5rem; font-weight:600; margin:0; letter-spacing:.01em}
-.masthead .stamp{color:var(--muted); font-size:.85rem}
+.masthead{display:flex; justify-content:space-between; align-items:center; gap:1.5rem;
+    min-height:4.6rem; color:#eaf4f1; background:var(--navy); margin:0 -1.5rem;
+    padding:.9rem 1.5rem}
+.masthead h1{font-size:1.05rem; font-weight:700; margin:0; letter-spacing:.02em}
+.masthead .stamp{color:#b9cfca; font-size:.76rem; margin-left:auto}
+.masthead nav{display:flex; gap:.45rem; align-items:center}
+.masthead nav a{border:1px solid #527078; border-radius:999px; padding:.35rem .75rem;
+    color:#eaf4f1; font-size:.76rem; text-decoration:none}
+.masthead nav a:hover{background:#315862; border-color:#84a9a2}
 
-.hero{margin:2.6rem 0 3rem}
-.hero .lede{color:var(--muted); font-size:.95rem; margin:0 0 .5rem}
-.hero .title{font-size:clamp(1.7rem,4.4vw,2.6rem); line-height:1.2;
-  font-weight:300; margin:0 0 .7rem; max-width:22ch}
-.hero .meta{font-size:1.05rem; margin:0}
-.hero .count{color:var(--muted); font-size:.95rem; margin:.55rem 0 0}
-.hero .count b{color:var(--ink); font-weight:600; font-size:1.25rem}
+.hero{position:relative; overflow:hidden; margin:0 -1.5rem 3.5rem; padding:4.2rem 1.5rem 4rem;
+    color:#f5fbf8; background:var(--navy)}
+.hero:after{content:""; position:absolute; inset:0 0 0 52%; opacity:.16;
+    background-image:linear-gradient(rgba(174,220,207,.55) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(174,220,207,.55) 1px,transparent 1px);
+    background-size:28px 28px; mask-image:linear-gradient(90deg,transparent,#000)}
+.hero>*{position:relative; z-index:1}
+.hero .lede{color:#a9d2c5; font-size:.76rem; letter-spacing:.16em; text-transform:uppercase; margin:0 0 .8rem}
+.hero .title{font-size:clamp(2rem,5vw,4.4rem); line-height:1.04;
+    font-weight:700; margin:0 0 1rem; max-width:13ch; letter-spacing:-.04em}
+.hero .meta{font-size:1rem; color:#d3e4df; margin:0}
+.hero .count{display:inline-flex; align-items:baseline; gap:.45rem; color:#b9cfca;
+    font-size:.86rem; margin:1.6rem 0 0; padding-top:1rem; border-top:1px solid #42636b}
+.hero .count b{color:#f5fbf8; font-weight:700; font-size:1.4rem}
 
-h2{font-size:1.05rem; font-weight:600; margin:0 0 1rem;
-   padding-bottom:.35rem; border-bottom:1px solid var(--rule)}
+h2{font-size:1.35rem; font-weight:700; margin:0 0 1.2rem; letter-spacing:-.02em}
+section{margin-top:3.5rem}
+section>h2:before{content:""; display:inline-block; width:.45rem; height:.45rem;
+    margin:0 .55rem .14rem 0; background:var(--navy); border-radius:50%}
 
 /* 季節格線 */
-.grid{background:var(--surface); border:1px solid var(--rule); padding:1rem .9rem 1.2rem;
-      overflow-x:auto}
+.grid{background:var(--surface); border:1px solid var(--rule); border-radius:1rem;
+    padding:1rem .9rem 1.2rem; overflow-x:auto; box-shadow:0 8px 24px rgba(28,55,58,.04)}
 .gridrow{display:grid; grid-template-columns:3.4rem repeat(12,1fr);
   column-gap:2px; row-gap:3px; min-width:640px}
 .months{margin-bottom:.4rem; border-bottom:1px solid var(--rule-soft); padding-bottom:.3rem}
@@ -223,7 +250,7 @@ h2{font-size:1.05rem; font-weight:600; margin:0 0 1rem;
 .months span:first-child{text-align:left}
 .yr{font-size:.9rem; color:var(--muted); align-self:center}
 .yr.now{color:var(--ink); font-weight:600}
-.bar{grid-row:auto; border-left:3px solid currentColor; background:#fff;
+.bar{grid-row:auto; border-left:3px solid currentColor; background:#fbfdfc;
   padding:.18rem .35rem; font-size:.73rem; line-height:1.25; min-width:0;
   border-top:1px solid var(--rule-soft); border-right:1px solid var(--rule-soft);
   border-bottom:1px solid var(--rule-soft)}
@@ -234,6 +261,8 @@ h2{font-size:1.05rem; font-weight:600; margin:0 0 1rem;
 .bar.past{opacity:.4}
 .acep{color:var(--acep)} .saem{color:var(--saem)}
 .ifem{color:var(--ifem)} .eusem{color:var(--eusem)}
+.asiansem{color:var(--asiansem)} .hkcem{color:var(--hkcem)}
+.sems{color:var(--sems)}
 .yearband{grid-column:1/-1; height:1px; background:var(--rule-soft); margin:.25rem 0}
 
 .legend{display:flex; gap:1.2rem; flex-wrap:wrap; margin:.9rem 0 0; font-size:.8rem}
@@ -241,21 +270,52 @@ h2{font-size:1.05rem; font-weight:600; margin:0 0 1rem;
   background:currentColor; vertical-align:-1px}
 .legend em{font-style:normal; color:var(--muted)}
 
-/* 明細表 */
-table{width:100%; border-collapse:collapse; margin-top:.2rem; font-size:.92rem}
-th{text-align:left; font-weight:600; font-size:.78rem; color:var(--muted);
-   border-bottom:1px solid var(--rule); padding:.4rem .5rem .4rem 0}
-td{padding:.55rem .5rem .55rem 0; border-bottom:1px solid var(--rule-soft);
-   vertical-align:top}
-tr.past td{color:var(--muted)}
-td.soc{white-space:nowrap; font-weight:600}
-td.soc::before{content:""; display:inline-block; width:3px; height:.85em;
-  background:currentColor; margin-right:.45rem; vertical-align:-1px}
-td.when{white-space:nowrap}
+/* Event cards */
+.event-switcher{display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    margin:-.35rem 0 1.4rem; flex-wrap:wrap}
+.year-tabs{display:flex; gap:.35rem; padding:.25rem; background:#e4ece9; border-radius:999px}
+.year-tab{border:0; border-radius:999px; padding:.45rem .9rem; background:transparent;
+    color:var(--muted); font:inherit; font-size:.8rem; font-weight:600; cursor:pointer}
+.year-tab:hover,.year-tab.active{background:var(--navy); color:#f5fbf8}
+.event-count{color:var(--muted); font-size:.8rem; margin:0}
+.event-grid{display:flex; flex-direction:column; gap:1.25rem}
+.event-card{display:grid; grid-template-columns:minmax(18rem,42%) 1fr; min-height:17rem;
+        color:var(--ink); text-decoration:none; background:var(--surface);
+        border:1px solid var(--rule); border-radius:1rem; overflow:hidden;
+        transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease}
+.event-card:hover{transform:translateY(-3px); box-shadow:0 12px 26px rgba(19,34,42,.11)}
+.event-card[hidden]{display:none}
+.event-card:focus-visible{outline:2px solid var(--ink); outline-offset:3px}
+.event-card.past{opacity:.62}
+.event-card.tba .event-visual{filter:saturate(.35)}
+.event-visual{display:flex; align-items:flex-end; min-height:17rem; padding:1.5rem;
+    color:#fff; background:linear-gradient(135deg,currentColor,#102d36 75%); position:relative; overflow:hidden}
+.event-visual:after{content:""; position:absolute; width:16rem; height:16rem; right:-5rem; top:-5rem;
+    border:1px solid rgba(255,255,255,.32); border-radius:50%; box-shadow:0 0 0 2rem rgba(255,255,255,.08),0 0 0 4rem rgba(255,255,255,.05)}
+.event-visual strong{position:relative; z-index:1; max-width:8ch; font-size:clamp(2rem,4vw,3.4rem);
+    line-height:.95; letter-spacing:-.05em}
+.event-visual.has-logo{align-items:center; justify-content:center; padding:1.5rem;
+    background:#f8fbfa}
+.event-visual.has-logo:after{border-color:rgba(16,45,54,.12); box-shadow:0 0 0 2rem rgba(16,45,54,.04),0 0 0 4rem rgba(16,45,54,.025)}
+.event-logo{position:relative; z-index:1; display:block; width:min(82%,20rem); height:9rem;
+    object-fit:contain; mix-blend-mode:multiply}
+.event-body{display:flex; flex-direction:column; min-width:0; padding:2rem 2.2rem}
+.event-org{font-size:.75rem; letter-spacing:.12em; color:currentColor; font-weight:700}
+.event-title{margin:.55rem 0 1.1rem; font-size:clamp(1.35rem,2.4vw,2rem); line-height:1.15; font-weight:700}
+.event-meta{display:grid; gap:.65rem; color:#52666b; font-size:.95rem}
+.event-meta span{display:block}
+.event-meta b{display:inline-block; min-width:3.4rem; margin-right:.45rem; color:var(--ink); font-size:.78rem; letter-spacing:.05em}
+.event-place{color:var(--muted); font-size:.86rem; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis}
+.event-action{align-self:flex-start; margin-top:auto; padding:.55rem .95rem; border:1px solid #aabac6;
+    border-radius:999px; color:#617894; font-size:.82rem; font-weight:600}
+.event-card:hover .event-action{border-color:currentColor; color:currentColor}
+.event-status{margin-top:.7rem; color:var(--muted); font-size:.73rem}
+.event-card.upcoming .event-status{color:var(--ink); font-weight:600}
 .tba-tag{color:var(--muted); font-style:italic}
 
-/* 投稿死線 */
-.dl{background:var(--surface); border:1px solid var(--rule); padding:.2rem 1rem .8rem}
+.dl{background:var(--surface); border:1px solid var(--rule); border-radius:1rem;
+    padding:.2rem 1.1rem .8rem; box-shadow:0 8px 24px rgba(28,55,58,.04)}
 .dl ol{list-style:none; margin:0; padding:0}
 .dl li{display:grid; grid-template-columns:5.2rem 1fr auto; gap:.8rem;
   align-items:baseline; padding:.6rem 0; border-bottom:1px solid var(--rule-soft)}
@@ -272,15 +332,25 @@ td.when{white-space:nowrap}
   padding:0 .3rem; margin-left:.4rem; white-space:nowrap}
 .dl .note{margin:.7rem 0 0; font-size:.8rem; color:var(--muted)}
 
-footer{margin-top:3.5rem; padding-top:1rem; border-top:1px solid var(--rule);
+footer{margin-top:4rem; padding-top:1.2rem; border-top:1px solid var(--rule);
   font-size:.82rem; color:var(--muted)}
 footer p{margin:.35rem 0}
 footer ul{margin:.4rem 0; padding-left:1.1rem}
 
 @media (max-width:640px){
   body{font-size:16px}
-  .wrap{padding:1.6rem 1rem 3rem}
-  table{font-size:.85rem}
+    .wrap{padding:0 1rem 3rem}
+    .masthead{margin:0 -1rem; padding:.9rem 1rem; flex-wrap:wrap}
+    .masthead nav{order:3; width:100%; margin-top:.2rem}
+    .masthead nav a{flex:1; text-align:center}
+    .hero{margin:0 -1rem 2.8rem; padding:3.3rem 1rem 3.2rem}
+    .hero:after{right:-8rem}
+    section{margin-top:2.8rem}
+    .year-tabs{width:100%; overflow-x:auto; justify-content:flex-start}
+    .year-tab{flex:0 0 auto}
+    .event-card{grid-template-columns:1fr; min-height:0}
+    .event-visual{min-height:10rem; padding:1.2rem}
+    .event-body{padding:1.3rem 1.2rem 1.4rem; min-height:14rem}
 }
 @media (prefers-reduced-motion:no-preference){
   .hero .count b{transition:none}
@@ -321,7 +391,7 @@ def deadline_section(deadlines: list[dict], today: date) -> str:
 
     live.sort(key=lambda x: x[0])
     if not live and not tba:
-        return ('<div class="dl"><p class="note">目前四個學會都沒有開放中的投稿。'
+        return ('<div class="dl"><p class="note">目前支援的學會都沒有開放中的投稿。'
                 '死線一公布就會出現在這裡。</p></div>')
 
     items = []
@@ -393,27 +463,50 @@ def render_html(rows: list[dict], today: date, generated: str,
         f'<span class="{v["hue"]}"><i></i>{k} <em>{v["meeting"]}</em></span>'
         for k, v in SOCIETY_META.items()) + "</p>"
 
-    # --- 明細表 ---
-    trs = []
+    # --- Event cards ---
+    cards = []
+    event_years = sorted({r.get("year") for r in rows if r.get("year")})
+    year_tabs = ['<button class="year-tab active" type="button" data-year="all">全部</button>']
+    year_tabs += [f'<button class="year-tab" type="button" data-year="{year}">{year}</button>'
+                  for year in event_years]
     for r in rows:
-        past = ' class="past"' if r["_end"] and r["_end"] < today else ""
         hue = SOCIETY_META.get(r["society"], {}).get("hue", "")
+        past = bool(r["_end"] and r["_end"] < today)
+        upcoming = bool(r["_start"] and r["_start"] >= today)
+        state = "past" if past else ("upcoming" if upcoming else "tba")
+        year_attr = html.escape(str(r.get("year") or "unknown"))
+        visual = html.escape(r["society"])
+        logo_url = SOCIETY_META.get(r["society"], {}).get("logo", "")
         if r["_confirmed"]:
-            when = f'{r["_start"].isoformat()} – {r["_end"].isoformat()}'
+            start = r["_start"]
+            end = r["_end"]
+            date_block = (f'<span class="month">{start.strftime("%b")}</span>'
+                          f'<span class="day">{start.day}</span>'
+                          f'<span class="year">{start.year}'
+                          f'{f"–{end.strftime("%b ")}{end.day}" if end != start else ""}'
+                          f'</span>')
+            date_text = f'{start.strftime("%b %-d, %Y")} – {end.strftime("%b %-d, %Y")}'
         else:
-            when = f'<span class="tba-tag">{html.escape(r.get("date_text") or "待公布")}</span>'
+            date_block = '<span class="tba-date">待公布</span>'
+            date_text = r.get("date_text") or "日期尚未公布"
         place = ", ".join(x for x in (r.get("city"), r.get("country_or_state")) if x)
-        venue = f'<br><span class="tba-tag">{html.escape(r["venue"])}</span>' if r.get("venue") else ""
         src = r.get("source_url", "")
-        name = html.escape(r.get("name", ""))
-        trs.append(
-            f"<tr{past}>"
-            f'<td class="soc {hue}">{html.escape(r["society"])}</td>'
-            f'<td><a href="{html.escape(src)}">{name}</a></td>'
-            f'<td class="when">{when}</td>'
-            f"<td>{html.escape(place) or '—'}{venue}</td></tr>")
-
-    dl_html = deadline_section(deadlines or [], today)
+        status = "已結束" if past else ("即將舉行" if upcoming else "日期待定")
+        cards.append(
+            f'<a class="event-card {hue} {state}" data-year="{year_attr}" href="{html.escape(src)}">'
+            f'<span class="event-visual{" has-logo" if logo_url else ""}">'
+            f'{f"<img class=\"event-logo\" src=\"{html.escape(logo_url)}\" alt=\"{visual} logo\" loading=\"lazy\" onerror=\"this.closest(\'.event-visual\').classList.remove(\'has-logo\');this.remove()\">" if logo_url else f"<strong>{visual}</strong>"}'
+            f'</span>'
+            f'<span class="event-body">'
+            f'<span class="event-org">{html.escape(r["society"])}</span>'
+            f'<span class="event-title">{html.escape(r.get("name", ""))}</span>'
+            f'<span class="event-meta">'
+            f'<span><b>日期</b>{html.escape(date_text)}</span>'
+            f'<span><b>地點</b>{html.escape(place or "地點待定")}</span>'
+            f'</span>'
+            f'<span class="event-status">{status}</span>'
+            f'<span class="event-action">查看官方活動</span>'
+            f'</span></a>')
 
     # --- Hero ---
     if nxt:
@@ -428,7 +521,7 @@ def render_html(rows: list[dict], today: date, generated: str,
             f'<b>—</b> 天後開幕</p></section>')
     else:
         hero = ('<section class="hero"><p class="lede">下一場</p>'
-                '<p class="title">四個學會目前都沒有公布未來場次。</p>'
+                '<p class="title">目前支援的學會都沒有公布未來場次。</p>'
                 '<p class="meta">下次自動更新時會重新檢查。</p></section>')
 
     return f"""<!DOCTYPE html>
@@ -437,10 +530,10 @@ def render_html(rows: list[dict], today: date, generated: str,
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>急診國際年會追蹤</title>
-<meta name="description" content="ACEP、SAEM、IFEM、EuSEM 四大急診醫學會年會的日期與地點，每月自動更新。">
+<meta name="description" content="七個急診醫學會年會的日期與地點，每週自動更新。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>{CSS}</style>
 </head>
 <body>
@@ -449,14 +542,13 @@ def render_html(rows: list[dict], today: date, generated: str,
 <header class="masthead">
   <h1>急診國際年會追蹤</h1>
   <p class="stamp">最後更新 {generated}</p>
+    <nav aria-label="快速連結">
+        <a href="conferences.ics">加入日曆</a>
+        <a href="conferences.csv">下載 CSV</a>
+    </nav>
 </header>
 
 {hero}
-
-<section>
-  <h2>投稿死線</h2>
-  {dl_html}
-</section>
 
 <section style="margin-top:3rem">
   <h2>年度節奏</h2>
@@ -465,25 +557,29 @@ def render_html(rows: list[dict], today: date, generated: str,
 </section>
 
 <section style="margin-top:3rem">
-  <h2>全部場次</h2>
-  <table>
-    <thead><tr><th>學會</th><th>會議</th><th>日期</th><th>地點</th></tr></thead>
-    <tbody>{"".join(trs)}</tbody>
-  </table>
+    <div class="event-switcher">
+        <h2>Upcoming events</h2>
+        <div class="year-tabs" role="tablist" aria-label="選擇活動年份">{"".join(year_tabs)}</div>
+    </div>
+    <p class="event-count" data-event-count></p>
+    <div class="event-grid">{"".join(cards)}</div>
 </section>
 
 <footer>
   <p>資料每月自動擷取自各學會官方頁面：</p>
   <ul>
-    <li>ACEP — acep.org/sa/general-information/future-dates</li>
-    <li>SAEM — saem.org/meetings-and-events/future-meetings</li>
-    <li>IFEM — ifem.cc/about_congress</li>
-    <li>EuSEM — eusemcongress.org</li>
+        <li>ACEP — acep.org/sa 與 future-dates</li>
+        <li>SAEM — saem.org/meetings-and-events/future-meetings</li>
+        <li>IFEM — ifem.cc/about_congress 與 ifem.cc/events</li>
+        <li>EuSEM — eusem.org 導向的 eusemcongress.org</li>
+        <li>AsianSEM — asiansem.org</li>
+        <li>HKCEM — hkcem.org.hk</li>
+        <li>SEMS — sems-online.com</li>
   </ul>
   <p>虛線框代表學會只公布了月份、尚未定案確切日期。訂閱
      <a href="conferences.ics">行事曆檔</a>，或下載
      <a href="conferences.csv">CSV</a>／<a href="conferences.json">JSON</a>。</p>
-  <p>報名與投稿死線請以官方公告為準；本頁只追蹤日期與地點。</p>
+    <p>資料來源為各學會官方頁面；本頁只追蹤年會日期與地點。</p>
 </footer>
 
 </div>
@@ -495,6 +591,27 @@ def render_html(rows: list[dict], today: date, generated: str,
   var days = Math.ceil((start - new Date()) / 86400000);
   el.querySelector('b').textContent = days > 0 ? days : 0;
   if (days <= 0) el.innerHTML = '<b>進行中</b>';
+}})();
+(function(){{
+    var tabs = document.querySelectorAll('.year-tab');
+    var cards = document.querySelectorAll('.event-card');
+    var count = document.querySelector('[data-event-count]');
+    function select(year){{
+        var visible = 0;
+        tabs.forEach(function(tab){{
+            tab.classList.toggle('active', tab.dataset.year === year);
+        }});
+        cards.forEach(function(card){{
+            var show = year === 'all' || card.dataset.year === year;
+            card.hidden = !show;
+            if(show) visible += 1;
+        }});
+        count.textContent = visible + ' 個活動';
+    }}
+    tabs.forEach(function(tab){{
+        tab.addEventListener('click', function(){{ select(tab.dataset.year); }});
+    }});
+    select('all');
 }})();
 </script>
 </body>

@@ -3,16 +3,17 @@
 """
 em_conferences.py
 -----------------
-擷取四大急診醫學會年會的「名稱 / 日期 / 地點」。
+擷取急診醫學會年會的「名稱 / 日期 / 地點」。
 
   ACEP  – American College of Emergency Physicians (Scientific Assembly)
   SAEM  – Society for Academic Emergency Medicine (Annual Meeting)
   IFEM  – International Federation for Emergency Medicine (ICEM / Global Congress)
-  EUSEM – European Society for Emergency Medicine (European EM Congress)
+    EUSEM – European Society for Emergency Medicine (European EM Congress)
+    ASIANSEM / HKCEM / SEMS – 亞洲及新加坡、香港急診醫學會
 
 設計原則
 ========
-1. 不抓首頁。四個學會的首頁都沒有年會日期，真正的資料在專屬頁面
+1. 優先抓專屬頁面；AsianSEM、HKCEM、SEMS 也會從首頁探索同網域的活動頁
    （ACEP /sa/general-information/future-dates、SAEM /meetings-and-events/future-meetings
    等），先鎖定這些「來源頁」再解析。
 2. 不綁 CSS class。這些都是 CMS（Sitefinity / NationBuilder / Optimizely / WordPress）
@@ -92,6 +93,40 @@ def fetch_text(url: str, session: requests.Session | None = None) -> str:
     r.raise_for_status()
     r.encoding = r.apparent_encoding or r.encoding
     return html_to_text(r.text)
+
+
+def fetch_event_site_text(url: str, session: requests.Session | None = None) -> str:
+    """Fetch a society home page plus a small set of same-site event pages."""
+    s = session or requests.Session()
+    r = s.get(url, headers=HEADERS, timeout=TIMEOUT)
+    r.raise_for_status()
+    r.encoding = r.apparent_encoding or r.encoding
+    soup = BeautifulSoup(r.text, "html.parser")
+    pages = [(url, html_to_text(r.text))]
+    seen = {url.rstrip("/")}
+    keywords = re.compile(r"event|conference|congress|annual|meeting|calendar|acem",
+                          re.I)
+    for link in soup.find_all("a", href=True):
+        href = link["href"].strip()
+        absolute = requests.compat.urljoin(url, href)
+        parsed = requests.utils.urlparse(absolute)
+        base = requests.utils.urlparse(url)
+        label = f"{link.get_text(' ', strip=True)} {absolute}"
+        if parsed.netloc != base.netloc or absolute.rstrip("/") in seen:
+            continue
+        if not keywords.search(label):
+            continue
+        seen.add(absolute.rstrip("/"))
+        try:
+            child = s.get(absolute, headers=HEADERS, timeout=TIMEOUT)
+            child.raise_for_status()
+            child.encoding = child.apparent_encoding or child.encoding
+            pages.append((absolute, html_to_text(child.text)))
+        except requests.RequestException:
+            continue
+        if len(pages) >= 8:
+            break
+    return "\n".join(text for _, text in pages)
 
 
 def html_to_text(html: str) -> str:
@@ -193,10 +228,15 @@ def split_location(s: str) -> tuple[str, str]:
 # --------------------------------------------------------------------------
 
 ACEP_URL = "https://www.acep.org/sa/general-information/future-dates"
+ACEP_CURRENT_URL = "https://www.acep.org/sa"
 SAEM_URL = "https://www.saem.org/meetings-and-events/future-meetings"
 IFEM_URL = "https://www.ifem.cc/about_congress"
+IFEM_EVENTS_URL = "https://www.ifem.cc/events"
 EUSEM_URL = "https://eusemcongress.org/"
 EUSEM_FALLBACK_URL = "https://eusem.org/"
+ASIANSEM_URL = "https://www.asiansem.org/"
+HKCEM_URL = "https://hkcem.org.hk/"
+SEMS_URL = "https://sems-online.com/"
 
 
 def parse_acep(text: str) -> list[Conference]:
@@ -227,6 +267,40 @@ def parse_acep(text: str) -> list[Conference]:
             society="ACEP", name=name, year=2000 + yy,
             date_text=raw, start=start, end=end,
             city=city, country_or_state=state, source_url=ACEP_URL))
+
+    # The current assembly lives on /sa and uses marketing copy instead of
+    # the future-dates row format, for example:
+    # "ACEP Scientific Assembly 2026 ... October 5-8, 2026 ... Chicago, Illinois".
+    title = re.search(r"ACEP\s+Scientific\s+Assembly\s+(20\d{2})", text, re.I)
+    if title:
+        year = int(title.group(1))
+        segment = text[title.start():title.start() + 1200]
+        date_match = re.search(
+            rf"{MONTH_RE}\s+\d{{1,2}}\s*{DASH}\s*\d{{1,2}},?\s*\d{{4}}",
+            segment, re.I)
+        start, end, raw = parse_date_range(date_match.group(0)) if date_match else ("", "", "")
+        location_match = re.search(r"\|\s*([A-Z][^\n|]{2,80})\s*\|", segment)
+        if not location_match:
+            location_match = re.search(
+                r"we['’]?re\s+excited\s+to\s+be\s+in\s+(.+?)\s+for\s+ACEP26",
+                segment, re.I | re.S)
+        if not location_match:
+            location_match = re.search(r"(?:in\s+)([A-Z][^\n|]{2,80})", segment)
+        location = (re.sub(r"\s+", " ", location_match.group(1)).strip(" ,|.!?")
+                    if location_match else "")
+        parts = [p.strip() for p in location.split(",") if p.strip()]
+        city = parts[0] if parts else ""
+        state = ", ".join(parts[1:])
+        if start:
+            complete = Conference(
+                society="ACEP", name=f"ACEP{str(year)[2:]} Scientific Assembly",
+                year=year, date_text=raw, start=start, end=end,
+                city=city, country_or_state=state, source_url=ACEP_CURRENT_URL)
+            existing = next((r for r in out if r.year == year), None)
+            if existing is None:
+                out.append(complete)
+            elif not existing.start:
+                out[out.index(existing)] = complete
     return out
 
 
@@ -377,6 +451,68 @@ def parse_eusem(text: str) -> list[Conference]:
     return out
 
 
+def parse_generic_society(text: str, society: str, source_url: str) -> list[Conference]:
+    """Parse event pages whose markup varies between CMS installations.
+
+    These societies publish event names and dates in different page templates,
+    so use short text blocks rather than CSS selectors. A TBA row is retained
+    when the site is reachable but has not published a congress date yet.
+    """
+    labels = {
+        "ASIANSEM": "Asian Conference on Emergency Medicine",
+        "HKCEM": "Hong Kong College of Emergency Medicine Annual Congress",
+        "SEMS": "Society for Emergency Medicine in Singapore Annual Conference",
+    }
+    out: list[Conference] = []
+    today = date.today()
+    relevant = {
+        "ASIANSEM": re.compile(r"acem|asian emergency medicine", re.I),
+        "HKCEM": re.compile(r"hkc?em|emergency medicine|joint clinical meeting|\bjcm\b", re.I),
+        "SEMS": re.compile(r"sems|acem|emergency medicine", re.I),
+    }[society]
+    excluded = re.compile(
+        r"radiolog|cardiovascular|cardiology|endorsement|registration form|previous|past",
+        re.I)
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not re.search(r"annual|congress|conference|meeting|event|acem|scientific",
+                         line, re.I) or not relevant.search(line) or excluded.search(line):
+            continue
+        # Only use the title and following details. Looking backwards lets a
+        # historical event's date leak into the next event title.
+        window = " ".join(x.strip() for x in lines[i:i + 5])
+        year_match = re.search(r"\b(20\d{2})\b", window)
+        year = int(year_match.group(1)) if year_match else None
+        start, end, raw = parse_date_range(window, default_year=year)
+        name = re.sub(r"\s+", " ", line).strip(" -:|")
+        if len(name) < 5 or len(name) > 140:
+            continue
+        if not start or not end:
+            continue
+        try:
+            end_date = date.fromisoformat(end)
+        except ValueError:
+            end_date = None
+        if end_date and end_date < today:
+            continue
+        if year and year < today.year:
+            continue
+        out.append(Conference(society=society, name=name, year=year,
+                              date_text=raw, start=start, end=end,
+                              source_url=source_url))
+
+    # Avoid duplicating the same event when its title and date appear nearby.
+    unique: dict[tuple[str, int | None, str], Conference] = {}
+    for row in out:
+        key = (row.name.lower(), row.year, row.start)
+        unique.setdefault(key, row)
+    if unique:
+        return list(unique.values())
+    return [Conference(society=society, name=labels[society],
+                       source_url=source_url,
+                       note="官方網站尚未公布可解析的年會日期")]
+
+
 # --------------------------------------------------------------------------
 # EUSEM 加分做法：The Events Calendar REST API
 # --------------------------------------------------------------------------
@@ -420,6 +556,12 @@ SCRAPERS: dict[str, tuple[str, Callable[[str], list[Conference]]]] = {
     "SAEM": (SAEM_URL, parse_saem),
     "IFEM": (IFEM_URL, parse_ifem),
     "EUSEM": (EUSEM_URL, parse_eusem),
+    "ASIANSEM": (ASIANSEM_URL,
+                  lambda text: parse_generic_society(text, "ASIANSEM", ASIANSEM_URL)),
+    "HKCEM": (HKCEM_URL,
+              lambda text: parse_generic_society(text, "HKCEM", HKCEM_URL)),
+    "SEMS": (SEMS_URL,
+             lambda text: parse_generic_society(text, "SEMS", SEMS_URL)),
 }
 
 
@@ -438,11 +580,41 @@ def scrape(only: Iterable[str] | None = None) -> list[Conference]:
                 if api:
                     results.extend(api)
                     continue
-            text = fetch_text(url, session)
+            if society == "ACEP":
+                # The current assembly is published on /sa, while future
+                # assemblies remain on the future-dates page.
+                text = fetch_text(ACEP_CURRENT_URL, session)
+                text += "\n" + fetch_text(ACEP_URL, session)
+            elif society == "IFEM":
+                # IFEM publishes congress information in both locations. Some
+                # deployments expose one page while Cloudflare blocks the other.
+                chunks = []
+                errors = []
+                for source in (IFEM_URL, IFEM_EVENTS_URL):
+                    try:
+                        chunks.append(fetch_text(source, session))
+                    except requests.RequestException as exc:
+                        errors.append(f"{source}: {type(exc).__name__}: {exc}")
+                text = "\n".join(chunks)
+                if not text:
+                    results.append(Conference(
+                        society="IFEM", name="IFEM Global Congress",
+                        source_url=IFEM_EVENTS_URL,
+                        note="官方網站目前無法存取（可能受到 Cloudflare 保護），日期待確認"))
+                    continue
+            else:
+                text = (fetch_event_site_text(url, session)
+                        if society in {"ASIANSEM", "HKCEM", "SEMS"}
+                        else fetch_text(url, session))
             got = parser(text)
             if not got:
                 print(f"[warn] {society}: 抓到頁面但沒解析出資料，版面可能改了 → {url}",
                       file=sys.stderr)
+                if society == "IFEM":
+                    got = [Conference(
+                        society="IFEM", name="IFEM Global Congress",
+                        source_url=IFEM_EVENTS_URL,
+                        note="官方頁面可存取但尚未解析出年會資料，日期待確認")]
             results.extend(got)
         except Exception as exc:                      # 單一站失敗不影響其他站
             print(f"[error] {society}: {type(exc).__name__}: {exc}", file=sys.stderr)
